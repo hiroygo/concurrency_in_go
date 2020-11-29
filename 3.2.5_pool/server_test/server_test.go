@@ -47,7 +47,12 @@ func startFastServer() *sync.WaitGroup {
 			svConn := connPool.Get()
 			fmt.Fprintln(conn, "")
 			connPool.Put(svConn)
+
 			// conn.Close() を defer にすると for 内なので切断されない
+
+			// ここで Close() を呼ばないと 読み込み側で ReadAll が終わらない
+			// ReadAll は EOF まで読み込む
+			// たぶん Close() で EOF を送信しているみたい
 			conn.Close()
 		}
 	}()
@@ -75,7 +80,12 @@ func startSlowServer() *sync.WaitGroup {
 
 			connectToExternalServer()
 			fmt.Fprintln(conn, "")
+
 			// conn.Close() を defer にすると for 内なので切断されない
+
+			// ここで Close() を呼ばないと 読み込み側で ReadAll が終わらない
+			// ReadAll は EOF まで読み込む
+			// たぶん Close() で EOF を送信しているみたい
 			conn.Close()
 		}
 	}()
