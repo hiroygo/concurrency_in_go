@@ -7,6 +7,30 @@ import (
 	"sync"
 )
 
+func orDone(done <-chan interface{}, in <-chan string) <-chan string {
+	c := make(chan string)
+	go func() {
+		defer close(c)
+		for {
+			select {
+			case <-done:
+				return
+			case s, ok := <-in:
+				if !ok {
+					return
+				}
+
+				select {
+				case <-done:
+					return
+				case c <- s:
+				}
+			}
+		}
+	}()
+	return c
+}
+
 func urlGenerator(done <-chan interface{}, urls ...string) <-chan string {
 	c := make(chan string)
 	go func() {
@@ -31,21 +55,12 @@ func head(done <-chan interface{}, urlCh <-chan string) <-chan headResponse {
 	c := make(chan headResponse)
 	go func() {
 		defer close(c)
-		for {
+		for url := range orDone(done, urlCh) {
+			resp, err := http.Head(url)
 			select {
 			case <-done:
 				return
-			case url, ok := <-urlCh:
-				if !ok {
-					return
-				}
-				resp, err := http.Head(url)
-
-				select {
-				case <-done:
-					return
-				case c <- headResponse{resp: resp, err: err}:
-				}
+			case c <- headResponse{resp: resp, err: err}:
 			}
 		}
 	}()

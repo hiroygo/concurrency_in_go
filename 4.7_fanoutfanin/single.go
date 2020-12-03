@@ -33,12 +33,18 @@ func head(done <-chan interface{}, urlCh <-chan string) <-chan headResponse {
 			select {
 			case <-done:
 				return
+				// かなり読みにくいので 4.8 or-done チャネル を使うと良い
 			case url, ok := <-urlCh:
 				if !ok {
 					return
 				}
 				resp, err := http.Head(url)
-				c <- headResponse{resp: resp, err: err}
+
+				select {
+				case <-done:
+					return
+				case c <- headResponse{resp: resp, err: err}:
+				}
 			}
 		}
 	}()
@@ -51,8 +57,8 @@ func main() {
 
 	for r := range head(done, urlGenerator(done,
 		"https://golang.org/pkg/net/http",
-        "https://www.youtube.com/",
-        "https://github.com/",
+		"https://www.youtube.com/",
+		"https://github.com/",
 		"https://www.google.co.jp/")) {
 		if r.err != nil {
 			fmt.Println(r.err)
